@@ -1,0 +1,70 @@
+import pandas as pd
+import itertools
+from openpyxl import Workbook
+
+def read_ipos(file_path):
+    """Read IPO data from a CSV file."""
+    return pd.read_csv(file_path)
+
+def generate_portfolios(ipos):
+    """Generate portfolios ensuring no overlapping listing dates."""
+    portfolios = []
+    for r in range(1, len(ipos) + 1):
+        for combination in itertools.combinations(ipos.iterrows(), r):
+            # Extract IPOs from the combination
+            selected_ipos = [ipo[1] for ipo in combination]
+            # Check for overlapping listing dates
+            if not has_overlapping_dates(selected_ipos):
+                portfolios.append(selected_ipos)
+    return portfolios
+
+def has_overlapping_dates(ipos):
+    """Check if any IPOs in the list have overlapping listing dates."""
+    listing_dates = [ipo['listing_date'] for ipo in ipos]
+    return len(listing_dates) != len(set(listing_dates))
+
+def analyze_portfolio(portfolio):
+    """Analyze the portfolio and return a summary."""
+    total_market_cap = sum(port['market_cap'] for port in portfolio)
+    return {
+        'number_of_ipos': len(portfolio),
+        'total_market_cap': total_market_cap
+    }
+
+def save_to_excel(portfolios, output_file):
+    """Save portfolios to an Excel file with separate sheets."""
+    wb = Workbook()
+    for i, portfolio in enumerate(portfolios):
+        ws = wb.create_sheet(title=f'Portfolio {i + 1}')
+        # Write header
+        ws.append(['IPO Name', 'Listing Date', 'Market Cap'])
+        for ipo in portfolio:
+            ws.append([ipo['ipo_name'], ipo['listing_date'], ipo['market_cap']])
+        
+        # Analyze and write analysis
+        analysis = analyze_portfolio(portfolio)
+        ws.append([])
+        ws.append(['Analysis'])
+        ws.append(['Number of IPOs', analysis['number_of_ipos']])
+        ws.append(['Total Market Cap', analysis['total_market_cap']])
+    
+    # Remove the default sheet created by Workbook
+    if 'Sheet' in wb.sheetnames:
+        wb.remove(wb['Sheet'])
+    
+    wb.save(output_file)
+
+def main():
+    file_path = 'ipos.csv'  # Path to your CSV file
+    output_file = 'ipo_portfolios.xlsx'  # Output Excel file
+    ipos = read_ipos(file_path)
+    
+    # Ensure the IPOs are unique based on some identifier, e.g., 'ipo_id'
+    ipos = ipos.drop_duplicates(subset='ipo_id')
+    
+    portfolios = generate_portfolios(ipos)
+    save_to_excel(portfolios, output_file)
+    print(f'Successfully saved {len(portfolios)} portfolios to {output_file}')
+
+if __name__ == '__main__':
+    main()
